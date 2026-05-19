@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>中俄·双子城交互地图 | 黑河 & 布拉戈维申斯克</title>
+    <!-- 高德地图安全密钥配置 (请务必替换为您自己的key和密钥) -->
+    <script type="text/javascript">
+        window._AMapSecurityConfig = {
+            securityJsCode: '13a519d61db4879f73d6ffe580a83288' // 替换为您自己的安全密钥
+        };
+    </script>
+    <script src="https://webapi.amap.com/maps?v=2.0&key=9d5700fecf783eb78ac8e3522817500e"></script>
+    <!-- 提示：如果key无效，请登录 https://lbs.amap.com/ 申请并替换 -->
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'PingFang SC', Roboto, 'Microsoft YaHei', sans-serif;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            transition: background 0.3s, color 0.2s;
+        }
+
+        .app-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 左侧面板 */
+        .sidebar {
+            width: 320px;
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(8px);
+            box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+            border-right: 1px solid rgba(0, 0, 0, 0.08);
+            overflow-y: auto;
+            transition: all 0.3s ease;
+        }
+
+        body.dark .sidebar {
+            background: rgba(30, 30, 40, 0.94);
+            border-right-color: rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+        }
+
+        .sidebar-header {
+            padding: 24px 20px 16px;
+            border-bottom: 1px solid #eee;
+        }
+
+        body.dark .sidebar-header {
+            border-bottom-color: #3a3a4a;
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.6rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #c72a2a, #2a6f8f);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .sidebar-header p {
+            font-size: 0.8rem;
+            margin-top: 6px;
+            color: #5a5a6e;
+        }
+
+        body.dark .sidebar-header p {
+            color: #aaa;
+        }
+
+        /* 搜索区 */
+        .search-area {
+            padding: 16px 20px;
+        }
+
+        .search-box {
+            display: flex;
+            background: #f3f3f5;
+            border-radius: 40px;
+            padding: 8px 16px;
+            align-items: center;
+        }
+
+        body.dark .search-box {
+            background: #2c2c38;
+        }
+
+        .search-box input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            outline: none;
+            font-size: 0.95rem;
+            padding: 6px 0;
+            color: #1e1e2a;
+        }
+
+        body.dark .search-box input {
+            color: #f0f0f0;
+        }
+
+        .search-box input::placeholder {
+            color: #888;
+        }
+
+        .search-box i {
+            color: #c72a2a;
+            margin-right: 8px;
+        }
+
+        .search-results {
+            margin-top: 16px;
+            max-height: 260px;
+            overflow-y: auto;
+            border-radius: 16px;
+        }
+
+        .result-item {
+            background: rgba(245, 245, 250, 0.7);
+            margin-bottom: 8px;
+            padding: 10px 14px;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        body.dark .result-item {
+            background: rgba(45, 45, 55, 0.7);
+        }
+
+        .result-item:hover {
+            background: #ffe8e0;
+            transform: translateX(4px);
+            border-left-color: #c72a2a;
+        }
+
+        .result-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .result-desc {
+            font-size: 0.7rem;
+            color: #6c6c7a;
+            margin-top: 4px;
+        }
+
+        /* 推荐地点列表 */
+        .places-list {
+            padding: 0 20px 20px;
+            flex: 1;
+        }
+
+        .section-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin: 16px 0 12px 0;
+        }
+
+        .place-badge {
+            background: #c72a2a10;
+            padding: 8px 12px;
+            border-radius: 20px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        body.dark .place-badge {
+            background: #2a2a3a;
+        }
+
+        .place-badge:hover {
+            background: #dc4c3a20;
+            transform: translateX(4px);
+        }
+
+        .place-name-cn {
+            font-weight: 500;
+        }
+
+        .place-name-ru {
+            font-size: 0.7rem;
+            color: #9a6e6e;
+        }
+
+        /* 主题切换 */
+        .theme-switch {
+            margin: 16px 20px 24px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .theme-btn {
+            flex: 1;
+            padding: 8px 0;
+            border-radius: 40px;
+            border: none;
+            background: #e9e9ef;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        body.dark .theme-btn {
+            background: #2c2c3a;
+            color: #ddd;
+        }
+
+        .theme-btn.active {
+            background: #c72a2a;
+            color: white;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+            background: #e9f2f0;
+        }
+
+        /* 信息窗美化：支持中俄双语风格 */
+        .custom-info {
+            padding: 8px 12px;
+            max-width: 320px;
+            border-radius: 16px;
+            background: rgba(255, 255, 245, 0.98);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+            border-left: 4px solid #c72a2a;
+            font-size: 0.85rem;
+        }
+        .custom-info h4 {
+            margin: 0 0 6px 0;
+            color: #b23c1c;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .custom-info p {
+            margin: 6px 0;
+            line-height: 1.4;
+        }
+        .ru-text {
+            color: #2c6e7e;
+            font-style: normal;
+            font-weight: 500;
+        }
+        body.dark .custom-info {
+            background: #2a2a32e6;
+            color: #f5f5f5;
+            border-left-color: #e06c4a;
+        }
+        body.dark .custom-info h4 {
+            color: #f0886a;
+        }
+        body.dark .ru-text {
+            color: #82c8d8;
+        }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #e0e0e0; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #c72a2a; border-radius: 10px; }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1>🇨🇳🇷🇺 中俄·双子城</h1>
+            <p>黑河 | 布拉戈维申斯克 交互地图</p>
+            <p style="font-size:12px; margin-top:6px;">✨ 左键：<span style="color:#c72a2a;">中俄文化·美食</span> &nbsp;|&nbsp; 右键：<span style="color:#2a6f8f;">中俄地理位置·重要之处</span></p>
+        </div>
+        <div class="search-area">
+            <div class="search-box">
+                <i>🔍</i>
+                <input type="text" id="searchInput" placeholder="搜索全部地点 (中文/俄文/美食/历史)..." autocomplete="off">
+            </div>
+            <div id="searchResults" class="search-results"></div>
+        </div>
+        <div class="places-list">
+            <div class="section-title">📍 推荐地点 (全部可搜)</div>
+            <div id="placesQuickList"></div>
+        </div>
+        <div class="theme-switch">
+            <button id="lightThemeBtn" class="theme-btn active">🌞 浅色</button>
+            <button id="darkThemeBtn" class="theme-btn">🌙 深色</button>
+        </div>
+        <div style="padding: 0 20px 20px; font-size: 11px; text-align: center; opacity: 0.6;">
+            🖱️ 滑轮缩放 | 左键/右键获取双语介绍
+        </div>
+    </div>
+    <div id="mapContainer" class="map-container"></div>
+</div>
+
+<script>
+    // ===================== 中俄双语数据集（包含全部地点，不只标记点，所有地点均可搜索）=====================
+    // 包含地图标记点以及额外可搜索的地点（虚拟文化旅游点）
+    const allPlacesData = [
+        {
+            id: 1,
+            nameCn: "黑河口岸",
+            nameRu: "Хэйхэ порт",
+            lng: 127.5197, lat: 50.2452,
+            isMarker: true,   // 地图上生成标记
+            cultureFoodCn: "🍜 中俄互市贸易区，每日大量中俄旅客往来，可购买俄罗斯巧克力、面粉。美食推荐：俄式烤肉串(шашлык)、东北铁锅炖、俄罗斯冰淇淋。",
+            cultureFoodRu: "🍜 Китайско-российская приграничная торговая зона. Рекомендуем: шашлык, китайское рагу, русское мороженое.",
+            importanceCn: "黑河口岸是中国一类口岸，与俄罗斯布拉戈维申斯克隔江相望，是中俄经贸重要通道。",
+            importanceRu: "Порт Хэйхэ — важнейший пункт пропуска на границе с Россией, напротив Благовещенска. Ключевой канал торговли."
+        },
+        {
+            id: 2,
+            nameCn: "大黑河岛",
+            nameRu: "Остров Большой Хэйхэ",
+            lng: 127.5352, lat: 50.2368,
+            isMarker: true,
+            cultureFoodCn: "🎉 中俄自由贸易城，每年举办中俄文化大集。美食：俄罗斯大列巴、熏鱼、黑龙江野生江鱼宴，酸黄瓜红菜汤。",
+            cultureFoodRu: "🎉 Торговый центр, фестиваль культуры. Еда: русский хлеб, копченая рыба, уха, борщ с солеными огурцами.",
+            importanceCn: "大黑河岛位于黑龙江主航道中方一侧，曾是国家一类口岸作业区，如今是中俄游客购物休闲胜地。",
+            importanceRu: "Остров Дахайхэдао — живописное место для прогулок и шопинга, центр дружбы двух народов."
+        },
+        {
+            id: 3,
+            nameCn: "瑷珲历史陈列馆",
+            nameRu: "Музей истории Айгунь",
+            lng: 127.4893, lat: 50.2115,
+            isMarker: true,
+            cultureFoodCn: "📜 铭记历史，爱国主义教育基地。周边美食：满族八大碗、杀猪菜、蓝莓酒。",
+            cultureFoodRu: "📜 Патриотическое образование. Местная кухня: маньчжурские яства, блюда из свинины, черничное вино.",
+            importanceCn: "瑷珲历史陈列馆记录《瑷珲条约》等史实，展示黑龙江流域历史变迁，国家级教育基地。",
+            importanceRu: "Музей рассказывает о договорах между Россией и Китаем, истории бассейна Амура."
+        },
+        {
+            id: 4,
+            nameCn: "黑龙江大桥公园",
+            nameRu: "Парк моста Хэйлунцзян",
+            lng: 127.5489, lat: 50.2683,
+            isMarker: true,
+            cultureFoodCn: "🌉 中俄首座跨境公路大桥，2022年通车。美食：俄式薄饼(блины)、锅包肉、黑龙江特产酒。",
+            cultureFoodRu: "🌉 Первый автомобильный мост между КНР и РФ. Блины, свинина в кисло-сладком соусе, местные настойки.",
+            importanceCn: "黑龙江大桥连接黑河与布拉戈维申斯克，促进两国经济与友谊，象征新时代合作。",
+            importanceRu: "Мост Хэйлунцзян соединяет Хэйхэ и Благовещенск, символ экономического сотрудничества."
+        },
+        {
+            id: 5,
+            nameCn: "布拉戈维申斯克列宁广场",
+            nameRu: "Площадь Ленина, Благовещенск",
+            lng: 127.5752, lat: 50.2884,
+            isMarker: true,
+            cultureFoodCn: "🎈 俄罗斯风情广场，列宁雕像，周围俄式教堂。美食：俄式馅饼(пирожки)、冷酸鱼、格瓦斯，俄式提拉米苏。",
+            cultureFoodRu: "🎈 Площадь с памятником Ленину. Пирожки, холодная рыба, квас, русский тирамису.",
+            importanceCn: "布市中央广场，每逢节日举办庆典，感受俄罗斯文化精髓的核心地带。",
+            importanceRu: "Центральная площадь Благовещенска, место городских праздников, душа русской культуры."
+        },
+        {
+            id: 6,
+            nameCn: "布拉戈维申斯克火车站",
+            nameRu: "Вокзал Благовещенска",
+            lng: 127.5678, lat: 50.2950,
+            isMarker: true,
+            cultureFoodCn: "🚂 百年欧式建筑，西伯利亚铁路重要车站。美食：俄式饺子(пельмени)、红菜汤、熏肉拼盘。",
+            cultureFoodRu: "🚂 Историческое здание, узловая станция Транссиба. Пельмени, борщ, мясное ассорти.",
+            importanceCn: "建于1915年，远东风格火车站，抵达莫斯科的列车起点之一，建筑艺术地标。",
+            importanceRu: "Вокзал 1915 года, архитектурная достопримечательность, отсюда поезда до Москвы."
+        },
+        {
+            id: 7,
+            nameCn: "中央步行街(黑河)",
+            nameRu: "Центральная пешеходная улица",
+            lng: 127.5281, lat: 50.2410,
+            isMarker: true,
+            cultureFoodCn: "🛍️ 中俄特色商品一条街，马迭尔冰棍、俄式蜂蜜蛋糕、东北烧烤。",
+            cultureFoodRu: "🛍️ Улица с сувенирами, мороженое «Мадиэр», русский медовый торт, барбекю.",
+            importanceCn: "黑河最繁华步行街，中俄双语招牌，展现边境独特商业魅力。",
+            importanceRu: "Главная торговая улица Хэйхэ с вывесками на двух языках."
+        },
+        // ========== 以下为额外的可搜索地点 (无地图标记，但仍然出现在搜索和左侧推荐，展示全部地点概念) ==========
+        {
+            id: 8,
+            nameCn: "俄罗斯风情园",
+            nameRu: "Парк русской культуры",
+            lng: 127.5100, lat: 50.2310,
+            isMarker: false,
+            cultureFoodCn: "🎪 仿俄式建筑群，夏季举办俄罗斯歌舞表演。美食：俄式烤肠、熏鱼、蜂蜜酒。",
+            cultureFoodRu: "🎪 Архитектурный ансамбль, русские песни и пляски. Колбаски, копченая рыба, медовуха.",
+            importanceCn: "中俄文化交流窗口，摄影佳地，网红打卡点。",
+            importanceRu: "Окно культурного обмена, популярное место для фото."
+        },
+        {
+            id: 9,
+            nameCn: "五大连池风景区",
+            nameRu: "Курорт Удаляньчи",
+            lng: 126.6800, lat: 48.6700,
+            isMarker: false,
+            cultureFoodCn: "🌋 世界地质公园，火山冷矿泉。美食：矿泉豆腐、冷水鱼、矿泉蛋。",
+            cultureFoodRu: "🌋 Геопарк, вулканические источники. Тофу из родниковой воды, рыба, яйца.",
+            importanceCn: "著名康养圣地，火山地貌与矿泉疗养闻名全国。",
+            importanceRu: "Известный курорт с вулканическими ландшафтами и минеральными водами."
+        },
+        {
+            id: 10,
+            nameCn: "知青博物馆",
+            nameRu: "Музей подёнщиков",
+            lng: 127.5080, lat: 50.2455,
+            isMarker: false,
+            cultureFoodCn: "📖 记录上山下乡历史，重现知青岁月。周边美食：大碴粥、贴饼子。",
+            cultureFoodRu: "📖 История городской молодежи в деревнях. Местная простая еда.",
+            importanceCn: "感受特殊年代的历史印记，弘扬奋斗精神。",
+            importanceRu: "Исторический след эпохи, дух самопожертвования."
+        }
+    ];
+
+    // 地图标记点只包含 isMarker === true 的地点
+    const markersData = allPlacesData.filter(p => p.isMarker === true);
+    
+    let map = null;
+    let markers = [];
+    let infoWindow = null;
+
+    // 初始化地图
+    function initMap() {
+        map = new AMap.Map('mapContainer', {
+            center: [127.53, 50.245],
+            zoom: 12,
+            scrollWheel: true,
+            zoomEnable: true,
+            resizeEnable: true
+        });
+        infoWindow = new AMap.InfoWindow({
+            offset: new AMap.Pixel(0, -30),
+            autoMove: true,
+            closeWhenClickMap: true
+        });
+
+        // 添加标记点（仅isMarker为true的地点）
+        markersData.forEach(place => {
+            const marker = new AMap.Marker({
+                position: [place.lng, place.lat],
+                title: place.nameCn,
+                label: {
+                    content: `<div style="background:#c72a2add; color:white; padding:2px 10px; border-radius:20px; font-size:12px; font-weight:bold;">${place.nameCn}</div>`,
+                    offset: new AMap.Pixel(0, 30),
+                    direction: 'top'
+                },
+                extData: place,
+                cursor: 'pointer'
+            });
+            // 左键: 中俄文化·美食双语版
+            marker.on('click', (e) => {
+                showInfoForMarker(marker, 'culture');
+            });
+            // 右键: 中俄地理位置+重要之处 双语版
+            marker.on('rightclick', (e) => {
+                AMap.event.preventDefault(e);
+                showInfoForMarker(marker, 'importance');
+            });
+            marker.setMap(map);
+            markers.push(marker);
+        });
+
+        // 避免地图空白区域右键菜单
+        map.on('rightclick', (e) => {
+            e.preventDefault();
+            if (infoWindow) infoWindow.close();
+        });
+        map.setFitView(markers);
+        buildQuickList();       // 展示全部地点（含非标记点）
+        bindSearchEvents();     // 搜索涵盖全部地点
+    }
+
+    // 展示信息窗（完全中俄双语）
+    function showInfoForMarker(marker, type) {
+        const place = marker.getExtData();
+        if (!place) return;
+        let contentHtml = '';
+        if (type === 'culture') {
+            // 左键: 文化美食 中+俄
+            contentHtml = `
+                <div class="custom-info">
+                    <h4>🍜 ${place.nameCn} | ${place.nameRu}</h4>
+                    <p><span style="font-weight:bold;">🇨🇳 中文·文化美食：</span><br>${place.cultureFoodCn}</p>
+                    <p><span style="font-weight:bold;" class="ru-text">🇷🇺 Русский·Культура и еда：</span><br>${place.cultureFoodRu}</p>
+                    <p style="font-size:0.7rem; margin-top:5px;">✨ 左键探索中俄风味</p>
+                </div>
+            `;
+        } else {
+            // 右键: 地理位置重要性 + 中俄双语解释
+            const lng = place.lng.toFixed(4);
+            const lat = place.lat.toFixed(4);
+            contentHtml = `
+                <div class="custom-info">
+                    <h4>📍 ${place.nameCn} | ${place.nameRu}</h4>
+                    <p>🗺️ <strong>坐标 / Координаты:</strong> ${lng}°E, ${lat}°N</p>
+                    <p><strong>🇨🇳 重要之处：</strong><br>${place.importanceCn}</p>
+                    <p><strong class="ru-text">🇷🇺 Важность:</strong><br>${place.importanceRu}</p>
+                    <p style="font-size:0.7rem; margin-top:5px;">🖱️ 右键查看地理价值</p>
+                </div>
+            `;
+        }
+        infoWindow.setContent(contentHtml);
+        infoWindow.open(map, marker.getPosition());
+    }
+
+    // 构建左侧推荐列表（展示全部地点，不只是标记点，增强搜索可见性）
+    function buildQuickList() {
+        const container = document.getElementById('placesQuickList');
+        if (!container) return;
+        container.innerHTML = '';
+        // 展示所有地点（包含非标记点，点击后若没有marker则只定位并展示文化卡片，通过模拟展示）
+        allPlacesData.forEach(place => {
+            const div = document.createElement('div');
+            div.className = 'place-badge';
+            div.innerHTML = `
+                <div>
+                    <div class="place-name-cn">${place.nameCn}</div>
+                    <div class="place-name-ru">${place.nameRu}</div>
+                </div>
+                <span style="font-size:12px;">🔍</span>
+            `;
+            div.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // 尝试找到对应的marker（如果存在标记）
+                const targetMarker = markers.find(m => m.getExtData().id === place.id);
+                if (targetMarker && map) {
+                    map.setCenter([place.lng, place.lat]);
+                    map.setZoom(14);
+                    showInfoForMarker(targetMarker, 'culture'); // 左键风格展示文化双语
+                } else {
+                    // 对于没有地图标记的点（如五大连池、风情园）仍然跳转到坐标并弹出自定义模拟信息窗（因为无marker，手动创建临时浮层）
+                    if (map) {
+                        map.setCenter([place.lng, place.lat]);
+                        map.setZoom(12);
+                        // 创建临时浮层信息窗，展示中俄双语文化内容（不依赖marker）
+                        const tempContent = `
+                            <div class="custom-info">
+                                <h4>📍 ${place.nameCn} | ${place.nameRu}</h4>
+                                <p><strong>🇨🇳 文化美食：</strong><br>${place.cultureFoodCn}</p>
+                                <p><strong class="ru-text">🇷🇺 Культура и еда：</strong><br>${place.cultureFoodRu}</p>
+                                <p><strong>⭐ 重要之处：</strong><br>${place.importanceCn}</p>
+                                <p><strong class="ru-text">⭐ Важность:</strong><br>${place.importanceRu}</p>
+                                <p style="margin-top:5px;">✨ 周边探索推荐</p>
+                            </div>
+                        `;
+                        infoWindow.setContent(tempContent);
+                        infoWindow.open(map, [place.lng, place.lat]);
+                    }
+                }
+            });
+            container.appendChild(div);
+        });
+    }
+
+    // 搜索功能 —— 覆盖所有地点（全量搜索，不只是标记点）
+    function performGlobalSearch(keyword) {
+        if (!keyword.trim()) {
+            document.getElementById('searchResults').innerHTML = '';
+            return;
+        }
+        const lowerKw = keyword.trim().toLowerCase();
+        // 匹配所有地点的 中文名、俄文名、文化美食中俄、重要性中俄 所有字段
+        const matched = allPlacesData.filter(place => {
+            return place.nameCn.toLowerCase().includes(lowerKw) ||
+                   place.nameRu.toLowerCase().includes(lowerKw) ||
+                   place.cultureFoodCn.toLowerCase().includes(lowerKw) ||
+                   place.cultureFoodRu.toLowerCase().includes(lowerKw) ||
+                   place.importanceCn.toLowerCase().includes(lowerKw) ||
+                   place.importanceRu.toLowerCase().includes(lowerKw);
+        });
+        const resultsContainer = document.getElementById('searchResults');
+        if (matched.length === 0) {
+            resultsContainer.innerHTML = '<div style="padding:12px;text-align:center;color:#aaa;">✨ 未找到匹配地点，试试“口岸”“广场”“火山”等</div>';
+            return;
+        }
+        let html = '';
+        matched.forEach(place => {
+            // 展示预览内容
+            let preview = place.cultureFoodCn.substring(0, 45) + '...';
+            html += `
+                <div class="result-item" data-id="${place.id}">
+                    <div class="result-name">🇨🇳 ${place.nameCn} | ${place.nameRu}</div>
+                    <div class="result-desc">${preview}</div>
+                </div>
+            `;
+        });
+        resultsContainer.innerHTML = html;
+        // 绑定点击事件
+        document.querySelectorAll('.result-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const id = parseInt(item.getAttribute('data-id'));
+                const selected = allPlacesData.find(p => p.id === id);
+                if (selected && map) {
+                    map.setCenter([selected.lng, selected.lat]);
+                    map.setZoom(13);
+                    // 尝试查找是否有对应marker
+                    const targetMarker = markers.find(m => m.getExtData().id === selected.id);
+                    if (targetMarker) {
+                        showInfoForMarker(targetMarker, 'culture');
+                    } else {
+                        // 非标记点：显示完整双语摘要（文化+重要之处）
+                        const contentFull = `
+                            <div class="custom-info">
+                                <h4>🔍 ${selected.nameCn} | ${selected.nameRu}</h4>
+                                <p><strong>🇨🇳 文化美食：</strong><br>${selected.cultureFoodCn}</p>
+                                <p><strong class="ru-text">🇷🇺 Кухня и культура:</strong><br>${selected.cultureFoodRu}</p>
+                                <p><strong>⭐ 重要之处：</strong><br>${selected.importanceCn}</p>
+                                <p><strong class="ru-text">⭐ Значение:</strong><br>${selected.importanceRu}</p>
+                            </div>
+                        `;
+                        infoWindow.setContent(contentFull);
+                        infoWindow.open(map, [selected.lng, selected.lat]);
+                    }
+                    // 清空搜索框显示选中地点
+                    document.getElementById('searchInput').value = selected.nameCn;
+                    resultsContainer.innerHTML = '';
+                }
+            });
+        });
+    }
+
+    // 绑定搜索input事件和主题切换
+    function bindSearchEvents() {
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => performGlobalSearch(e.target.value));
+        }
+        // 主题切换
+        document.getElementById('lightThemeBtn').addEventListener('click', () => switchTheme('light'));
+        document.getElementById('darkThemeBtn').addEventListener('click', () => switchTheme('dark'));
+    }
+
+    function switchTheme(theme) {
+        const body = document.body;
+        const lightBtn = document.getElementById('lightThemeBtn');
+        const darkBtn = document.getElementById('darkThemeBtn');
+        if (theme === 'dark') {
+            body.classList.add('dark');
+            lightBtn.classList.remove('active');
+            darkBtn.classList.add('active');
+            if (map) map.setMapStyle('amap://styles/dark');
+        } else {
+            body.classList.remove('dark');
+            lightBtn.classList.add('active');
+            darkBtn.classList.remove('active');
+            if (map) map.setMapStyle('amap://styles/normal');
+        }
+    }
+
+    // 启动地图
+    window.onload = () => {
+        if (typeof AMap !== 'undefined' && AMap.Map) {
+            initMap();
+        } else {
+            console.warn("高德地图加载延迟或Key无效");
+            document.getElementById('mapContainer').innerHTML = '<div style="padding:40px;text-align:center;background:#fff3e0;height:100%;">⚠️ 地图加载失败，请检查高德Key配置及网络。<br>您需要注册高德开发者并替换代码顶部Key和安全密钥。</div>';
+        }
+    };
+    // 全局禁止右键默认菜单（地图区域已处理）
+    document.addEventListener('contextmenu', function(e) {
+        if (e.target.closest('.map-container') || e.target.closest('.amap-marker') || e.target.closest('.amap-icon')) {
+            e.preventDefault();
+        }
+    });
+</script>
+</body>
+</html>
